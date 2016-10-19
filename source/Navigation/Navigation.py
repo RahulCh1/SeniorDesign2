@@ -5,6 +5,8 @@ Created on Sep 27, 2016
 '''
 from Vector import Vector3D, Point3D
 import Navigation
+#source: http://stackoverflow.com/questions/36748829/piping-binary-data-between-python-and-c
+import subprocess
 
 if __name__ == '__main__':
     myNav = Navigation.Nav()
@@ -66,7 +68,41 @@ class Nav(object):
         Constructor
         '''
         print "Navigation started! \n"
-        pass
+        
+        '''
+        subprocess.Popen opens out.exe (the C++ program)
+        stdin of out.exe is piped and controlled by python
+        stdout of out.exe is piped and read by python
+        '''
+        proc = subprocess.Popen("C:/Users/Rahul/Desktop/ArUCO/SeniorDesign2ArUCO/build/bin/Release/aruco_simple.exe",cwd=r'C:/Users/Rahul/Desktop/ArUCO/SeniorDesign2ArUCO/build/bin/Release/',stdin=subprocess.PIPE,stdout=subprocess.PIPE)
+        
+        '''
+        It works! The C program was hanging on imread("../../resources/leftArrow.png") because the 
+        current working directory was not set as where the executable is being called from.
+        Fixed by setting cwd (current working directory) in Popen
+        source: http://stackoverflow.com/questions/1685157/python-specify-popen-working-directory-via-argument
+        '''
+        
+        i = 0
+        while i < 100:
+            message = proc.stdout.readline()
+            message = message.strip() #remove blanks
+            if message != '':
+                i += 1
+                print str(i) +": " + message
+        
+        
+        '''
+        Popen.wait() waits for the child process to terminate
+        Popen.kill() kills the child process
+        '''
+        proc.kill()
+    
+    '''
+    Get JSON from OpenCV
+    '''
+    def ParseJSON(self):
+        pass    
     
     '''
     Might Implement later
