@@ -7,7 +7,7 @@ Created on Sep 28, 2016
 import PIL.Image
 import PIL.ImageTk
 import Tkinter
-
+from Navigation import Navigation
 '''
  RC - used globals to make this work because did not want to self.var name each time.
  I will look up better practice for this 
@@ -18,7 +18,7 @@ class Display(object):
     classdocs
     '''    
     
-    def __init__(self):
+    def __init__(self,myNavigation):
         '''
         Constructor
         '''
@@ -52,11 +52,16 @@ class Display(object):
         label = Tkinter.Label(self.root, image=upArrow)
         clickNumber = 0
         button = Tkinter.Button(self.root, text="Simulate Being Called!", command = lambda: self.onClick())
+        exitButton = Tkinter.Button(self.root, text="Exit", command = lambda: myNavigation.Exit())
         button.pack()
+        exitButton.pack()
         label.pack()
     
-    def startGui(self):
+    def startGuiMainLoop(self):
         self.root.mainloop()
+        
+    def updateGui(self):
+        self.root.update()
             
     def onClick(self):
         #declare clickNumber as global so that clickNumber is actually incremented
