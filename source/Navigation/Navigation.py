@@ -18,7 +18,7 @@ class Navigation(object):
         '''
         Ranges:
         Rotation x: -3.3 to 3.52
-        Rotation y: -0.15 to 0.27
+        Rotation y: -2.53 to 2.53
         Rotation z: -0.56 to 0.61
         
         Translation x: -0.27 to 0.26 
@@ -31,7 +31,12 @@ class Navigation(object):
         
         self.backwardZThreshold = 0.7
         self.forwardZThreshold = 2
-    
+        
+        self.yRotationNegativeThreshold = -0.075
+        self.yRotationPositiveThreshold = 0.075
+        self.yRotationOffset = 0.1
+        
+        
         print "Navigation started! \n"
         
         '''
@@ -56,60 +61,103 @@ class Navigation(object):
     Might Implement later
     Get the angle to steer in depending on angle between axis of Camera and Marker
     '''
-    def GetSteeringAnglePose(self,CameraPose,MarkerPose):
-        pass
+    def GetMappedSteeringAngle(self,yRotation):
+        '''
+        Rotation of y range:
+            -2.53 to 2.53
+            CCW is negative
+            CW is positive
+            180 degrees (from vector perpendicular to camera) is -2.53 and 2.53
+            0   degrees (from vector perpendicular to camera) is  0.0
+        
+        Map y range [-2.53 to 2.53] to [0 degrees to 360 degrees]
+        Force steering so yRotation is close to 0
+    
+        '''
+        
+        '''
+        Calibration, 0.1 lines up for straight on, so subtract offset
+        '''
+        yRotation -= self.yRotationOffset
+        
+        if yRotation >= self.yRotationNegativeThreshold and yRotation <= self.yRotationPositiveThreshold:
+            return 0 #steering is on point
+        elif yRotation < -0.1:
+            return (yRotation/-2.53)*-180
+        else:
+            return (yRotation/2.53)*180
+        
     
     '''
-    Get the steering angle (in the future) based on the Rotation and Translation vector from the center of the Camera to center of Marker 
+    Get the steering angle (in the future) based on the Rotation and Translation vector from the center of the Camera to center of Marker
+    Stores GUI picture number in queue (a mutable object) by a Thread of this method which is retrieved in main later
     '''
     def GetSteeringAngleRotationTranslation(self,my_queue):
         '''
         Ranges:
         Rotation x: -3.3 to 3.52
-        Rotation y: -0.23 to 0.23
+        Rotation y: -2.53 to 2.53
         Rotation z: -0.56 to 0.61
         
         Translation x: -0.27 to 0.26
         Translation y: -0.20 to 0.18
         Translation z: 0 to 2.61
         '''
-        
         try:
             parsed_JSON = self.piped_json.GetParsedJSON()
         except:
-            print "ERROR: GetParsedJSON() in method GetSteeringAngleRotationTranslation() of Navigation"
+            print "\nERROR: GetParsedJSON() in method GetSteeringAngleRotationTranslation() of Navigation"
             print "Exitting all..."
             self.Exit()
             thread.exit()
             
         Translation = Vector3D(Point3D(parsed_JSON["Markers"][0]["T"]["x"],parsed_JSON["Markers"][0]["T"]["y"],parsed_JSON["Markers"][0]["T"]["z"]))
+        Rotation = Vector3D(Point3D(parsed_JSON["Markers"][0]["R"]["x"],parsed_JSON["Markers"][0]["R"]["y"],parsed_JSON["Markers"][0]["R"]["z"]))
         
-        toReturnStr = ""
         
-        if Translation.Point.x <= self.leftXThreshold:
-            toReturnStr = toReturnStr + "Turn left \n"
+        '''
+        Get steering angle
+        '''
+        #print "Steering angle: " + str(self.GetMappedSteeringAngle(Rotation.Point.y)) + ", " + str(Rotation.Point.y)
+        steeringAngle = self.GetMappedSteeringAngle(Rotation.Point.y)
+                
+        '''
+        Put number in queue for displaying appropriate GUI image
+        '''
+        
+#         if Translation.Point.x <= self.leftXThreshold:
+#             my_queue.put(9) #for turning left
+#         if Translation.Point.x >= self.rightXThreshold:
+#             my_queue.put(7) #for turning right
+
+        
+        '''
+        TODO: Get time lapsed between each detected marker so can decide whether or not markers
+        are in field of view or if lost track for quite some time.
+        Issues with this approach: Getting parsed_JSON is also blocking. Also calling this method from thread.
+        Resolution to this approach: Use boolean flag on Navigation which is set when method thread runs out of time to execute
+        Alternative approach issue: Cannot change C++ code to send blanks because MDetector.detect() is also blocking
+        '''
+        
+        
+        if steeringAngle > 0:
+            my_queue.put(7) #for turning right
+        elif steeringAngle < 0:
             my_queue.put(9)
-            return 9 #for turning left
-        if Translation.Point.x >= self.rightXThreshold:
-            toReturnStr = toReturnStr + "Turn right \n"
-            my_queue.put(7)
-            return 7 #for turning right
-        if Translation.Point.z <= self.backwardZThreshold:
-            toReturnStr = toReturnStr + "Go forward \n"
-            my_queue.put(8)
-            return 8 #for going backward
-        if Translation.Point.z >= self.forwardZThreshold:
-            toReturnStr = toReturnStr + "Go backward \n"
-            my_queue.put(6)
-            return 6 #for going forward
         else:
-            toReturnStr = "Stop"
-            my_queue.put(5)
-            return 5 #for default stop sign
-     
-        return toReturnStr
-        
-        
+            '''
+            steeringAngle == 0, continue forward
+            TODO: Add logic to check check distance z and translation to decide to continue
+            forward or turn and somehow get on track
+            '''
+            my_queue.put(6)
+                
+#         if Translation.Point.z <= self.backwardZThreshold:
+#             my_queue.put(8) #for going backward
+#         if Translation.Point.z >= self.forwardZThreshold:
+#             my_queue.put(6) #for going forward
+#         else:
+#             my_queue.put(5) #for default stop sign
     
     '''
     Maybe unnecessary to find error. Can just get angle difference and act on that.

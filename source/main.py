@@ -6,6 +6,7 @@ Created on Sep 28, 2016
 import os.path, sys
 import threading 
 import Queue
+import time
 # Add current dir to search path.
 sys.path.insert(0, "GUI")
 # sys.path.insert(1, "Navigation")
@@ -28,14 +29,23 @@ if __name__ == '__main__':
     my_queue.put(5)
     
     bufferedPipeThread = threading.Thread(target=myNavigation.GetSteeringAngleRotationTranslation,args=(my_queue,))
+    '''
+    Note: Threads can only .start() once, so create a new Thread each time for reading pipe
+    '''
     
-    # Threads can only .start() once, so create a new Thread each time for reading pipe
+    #initialize startTime to current time plus 5 so the first attempt has 5 seconds to find a marker
+    startTime = time.time() + 5
+    
     while not myNavigation.exitMain:
+        
+        if time.time() - startTime >= 2:
+            my_queue.put(5) #put 5 for stop sign, immediately read by DisplayImageByNumber below so queue does not overflow
             
         if not bufferedPipeThread.isAlive():
             bufferedPipeThread = threading.Thread(target=myNavigation.GetSteeringAngleRotationTranslation,args=(my_queue,))
             bufferedPipeThread.start()
-#         bufferedPipeThread.join()
+            startTime = time.time()
+            #bufferedPipeThread.join()
         
         #look into threading the navigation/buffered pipe or use unbuffered pipe from POpen
         
@@ -43,9 +53,5 @@ if __name__ == '__main__':
             myGui.DisplayImageByNumber(my_queue.get())
         
         #updateGui outside so GUI buttons work unconditionally
-        myGui.updateGui()    
-    
-    
-    
-        
+        myGui.updateGui()        
         
