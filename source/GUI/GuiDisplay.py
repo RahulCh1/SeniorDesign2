@@ -7,6 +7,8 @@ Created on Sep 28, 2016
 import PIL.Image
 import PIL.ImageTk
 import Tkinter
+import sys
+sys.path.append('../Navigation/')
 from Navigation import Navigation
 '''
  RC - used globals to make this work because did not want to self.var name each time.

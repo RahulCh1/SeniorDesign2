@@ -3,10 +3,14 @@ Created on Sep 27, 2016
 
 @author: Rahul
 '''
+import Adafruit_PCA9685
 from PipedJSON import PipedJSON
 from Vector import Vector3D, Point3D
 import Queue
 import thread
+import time
+import RPi.GPIO as io
+io.setmode(io.BOARD)
 
 class Navigation(object):
     '''
@@ -44,8 +48,39 @@ class Navigation(object):
         stdin of out.exe is piped and controlled by python
         stdout of out.exe is piped and read by python
         '''
-        self.piped_json = PipedJSON("aruco_simple.exe","C:/Users/Rahul/Desktop/ArUCO/SeniorDesign2ArUCO/build/bin/Release")
+        self.piped_json = PipedJSON("aruco_simple","/home/pi/Desktop/SeniorDesign2ArUCO/build/utils/")
         
+	'''
+	PWM Driver
+        60 Hz => 16.67 ms
+        12 bits = 4096
+        Testing servo with function generator: 0.9 ms to 2.0 ms
+        16.67/4096 = 1.1/x
+        '''
+	self.servo_pin = 8
+	self.servo_min = 270
+	self.servo_max = 442
+	self.servo_default = 356 
+	
+	'''
+	Drive Motor
+	'''
+	self.drive_direction = 13
+	self.drive_pwm_pin = 5
+	self.drive_speed = 4000
+	
+	try:
+		self.pwm = Adafruit_PCA9685.PCA9685()
+		self.pwm.set_pwm_freq(60)
+		print "Resetting servo to default..."
+		self.pwm.set_pwm(self.servo_pin,0,self.servo_default)
+		time.sleep(1)
+		print "Resetting servo done!"
+		
+	except:
+		print "ERROR: PWM Driver not detected"
+		self.Exit()
+
         self.exitMain = False
     
     def GetParsedJSON(self):
@@ -55,6 +90,8 @@ class Navigation(object):
     def Exit(self):
         print "Exitting Navigation..."
         self.piped_json.KillProcess()
+	print "Resetting servo to default position..."
+	self.pwm.set_pwm(self.servo_pin,0,self.servo_default)
         self.exitMain = True
         
     '''
@@ -142,14 +179,18 @@ class Navigation(object):
         
         if steeringAngle > 0:
             my_queue.put(7) #for turning right
+	    self.pwm.set_pwm(self.servo_pin,0,self.servo_min)
         elif steeringAngle < 0:
-            my_queue.put(9)
+            my_queue.put(9) #for turning left
+            self.pwm.set_pwm(self.servo_pin,0,self.servo_max)
         else:
             '''
             steeringAngle == 0, continue forward
             TODO: Add logic to check check distance z and translation to decide to continue
             forward or turn and somehow get on track
             '''
+	    self.pwm.set_pwm(self.drive_pwm_pin,0,self.drive_speed)
+	    self.pwm.set_pwm(self.servo_pin,0,self.servo_default)
             my_queue.put(6)
                 
 #         if Translation.Point.z <= self.backwardZThreshold:

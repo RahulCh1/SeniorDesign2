@@ -8,8 +8,10 @@ import threading
 import Queue
 import time
 # Add current dir to search path.
-sys.path.insert(0, "GUI")
+# sys.path.insert(0, "GUI")
 # sys.path.insert(1, "Navigation")
+sys.path.append('GUI')
+sys.path.append('Navigation')
 
 import GuiDisplay as gui
 
@@ -19,7 +21,7 @@ if __name__ == '__main__':
     
     #start navigation
     myNavigation = Navigation()
-    
+        
     #start gui
     myGui = gui.Display(myNavigation)
     my_queue = Queue.Queue()
@@ -35,12 +37,12 @@ if __name__ == '__main__':
     
     #initialize startTime to current time plus 5 so the first attempt has 5 seconds to find a marker
     startTime = time.time() + 5
-    
+    MarkerTimeout = 1
     while not myNavigation.exitMain:
         
-        if time.time() - startTime >= 2:
+	if time.time() - startTime >= MarkerTimeout:
             my_queue.put(5) #put 5 for stop sign, immediately read by DisplayImageByNumber below so queue does not overflow
-            
+            myNavigation.pwm.set_pwm(myNavigation.drive_pwm_pin,0,0)
         if not bufferedPipeThread.isAlive():
             bufferedPipeThread = threading.Thread(target=myNavigation.GetSteeringAngleRotationTranslation,args=(my_queue,))
             bufferedPipeThread.start()
