@@ -3,7 +3,7 @@ Created on Sep 28, 2016
 
 @author: Rahul
 '''
-import os.path, sys
+import os, sys
 import threading 
 import Queue
 import time
@@ -39,10 +39,10 @@ if __name__ == '__main__':
     startTime = time.time() + 5
     MarkerTimeout = 1
     while not myNavigation.exitMain:
-        
-	if time.time() - startTime >= MarkerTimeout:
+        if time.time() - startTime >= MarkerTimeout:
             my_queue.put(5) #put 5 for stop sign, immediately read by DisplayImageByNumber below so queue does not overflow
-            myNavigation.pwm.set_pwm(myNavigation.drive_pwm_pin,0,0)
+            if os.name == "posix":
+                myNavigation.pwm.set_pwm(myNavigation.drive_pwm_pin,0,0)
         if not bufferedPipeThread.isAlive():
             bufferedPipeThread = threading.Thread(target=myNavigation.GetSteeringAngleRotationTranslation,args=(my_queue,))
             bufferedPipeThread.start()

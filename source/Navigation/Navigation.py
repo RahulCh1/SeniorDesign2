@@ -3,14 +3,19 @@ Created on Sep 27, 2016
 
 @author: Rahul
 '''
-import Adafruit_PCA9685
+import os
+
+if os.name == "posix": #checks if running on Pi
+    import Adafruit_PCA9685
+    import RPi.GPIO as io
+    io.setmode(io.BOARD)
+    
 from PipedJSON import PipedJSON
 from Vector import Vector3D, Point3D
 import Queue
 import thread
 import time
-import RPi.GPIO as io
-io.setmode(io.BOARD)
+
 
 class Navigation(object):
     '''
@@ -38,7 +43,11 @@ class Navigation(object):
         
         self.yRotationNegativeThreshold = -0.075
         self.yRotationPositiveThreshold = 0.075
-        self.yRotationOffset = 0.1
+        
+        if os.name == "posix":
+            self.yRotationOffset = 0.1
+        else:
+            self.yRotationOffset = 0
 
         self.yRotationMin = -2.53
         self.yRotationMax = 2.53
@@ -51,10 +60,20 @@ class Navigation(object):
         stdin of out.exe is piped and controlled by python
         stdout of out.exe is piped and read by python
         '''
-        self.piped_json = PipedJSON("aruco_simple","/home/pi/Desktop/SeniorDesign2ArUCO/build/utils/")
+        exeName = ""
+        exePath = ""
         
-	'''
-	PWM Driver
+        if os.name == "posix":
+            exeName = "aruco_simple"
+            exePath = "/home/pi/Desktop/SeniorDesign2ArUCO/build/utils/"
+        else:
+            exeName = "aruco_simple.exe"
+            exePath = "C:/Users/Rahul/Desktop/ArUCO/SeniorDesign2ArUCO/build/bin/Release"
+        
+        self.piped_json = PipedJSON(exeName,exePath)
+        
+    	'''
+    	PWM Driver
         60 Hz => 16.67 ms
         12 bits = 4096
         Testing servo with function generator: 0.9 ms to 2.0 ms
@@ -63,35 +82,36 @@ class Navigation(object):
         Wheels turn about +/- 40 degrees => 2.53*(40/180) = 0.562
         
         '''
-	self.servo_pin = 8
-	self.servo_min = 280 #270
-	self.servo_max = 430 #442
-	self.servo_range = self.servo_max - self.servo_min
-	self.servo_middle = self.servo_range/2 + self.servo_min #356 
+        self.servo_pin = 8
+        self.servo_min = 280 #270
+        self.servo_max = 430 #442
+        self.servo_range = self.servo_max - self.servo_min
+        self.servo_middle = self.servo_range/2 + self.servo_min #356 
         print "Middle: " + str(self.servo_middle)
-	self.marker_leftmax_threshold = -0.562
-	self.marker_rightmax_threshold = 0.562
-	
-	'''
-	Drive Motor
-	'''
-	self.drive_direction = 13
-	self.drive_pwm_pin = 5
-	self.drive_speed = 1500
-	
-	try:
-		self.pwm = Adafruit_PCA9685.PCA9685()
-		self.pwm.set_pwm_freq(60)
-		print "Resetting servo to default..."
-		self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
-		time.sleep(1)
-		print "Resetting servo done!"
-		
-	except:
-		print "ERROR: PWM Driver not detected"
-		self.Exit()
-
+        self.marker_leftmax_threshold = -0.562
+        self.marker_rightmax_threshold = 0.562
+        
+        '''
+        Drive Motor
+        '''
+        self.drive_direction = 13
+        self.drive_pwm_pin = 5
+        self.drive_speed = 1500
+        
         self.exitMain = False
+
+        if os.name == "posix":
+            try:
+                self.pwm = Adafruit_PCA9685.PCA9685()
+                self.pwm.set_pwm_freq(60)
+                print "Resetting servo to default..."
+                self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
+                time.sleep(1)
+                print "Resetting servo done!"
+            except:
+                print "ERROR: PWM Driver not detected"
+                self.Exit()
+                self.exitMain = False
     
     def GetParsedJSON(self):
         return self.piped_json.GetParsedJSON()
@@ -100,8 +120,9 @@ class Navigation(object):
     def Exit(self):
         print "Exitting Navigation..."
         self.piped_json.KillProcess()
-	print "Resetting servo to default position..."
-	self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
+        print "Resetting servo to default position..."
+        if os.name == "posix":
+            self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
         self.exitMain = True
         
     '''
@@ -128,7 +149,7 @@ class Navigation(object):
         yRotation -= self.yRotationOffset
         
         if yRotation >= self.yRotationNegativeThreshold and yRotation <= self.yRotationPositiveThreshold:
-            return 0 #steering is on point
+            return self.servo_middle #steering is on point
         elif yRotation <= self.marker_leftmax_threshold:
             return self.servo_min
         elif yRotation >= self.marker_rightmax_threshold:
@@ -137,9 +158,11 @@ class Navigation(object):
             '''
             Return marker rotation mapped to servo rotation number
             '''
+            print "Rotation: " + str(yRotation)
+            
             #turn left
             if yRotation <= self.yRotationNegativeThreshold:
-                servoSteering = int(self.servo_min+(self.servo_range/2)*(yRotation/(self.marker_rightmax_threshold-self.yRotationPositiveThreshold)))                
+                servoSteering = int(self.servo_middle+(self.servo_range/2)*(yRotation/(self.marker_rightmax_threshold-self.yRotationPositiveThreshold)))                
                 print "Left: " + str(servoSteering)
                 return servoSteering
             #turn right
@@ -199,24 +222,26 @@ class Navigation(object):
         Resolution to this approach: Use boolean flag on Navigation which is set when method thread runs out of time to execute
         Alternative approach issue: Cannot change C++ code to send blanks because MDetector.detect() is also blocking
         '''
-        self.pwm.set_pwm(self.servo_pin,0,steeringAngle)
+        if os.name == "posix":
+            self.pwm.set_pwm(self.servo_pin,0,steeringAngle)
         
-        if steeringAngle > 0:
+        if steeringAngle > self.servo_middle:
             my_queue.put(7) #for turning right
-	    #my_queue.put(6)
-	    #self.pwm.set_pwm(self.servo_pin,0,self.servo_min)
-        elif steeringAngle < 0:
+        #my_queue.put(6)
+        #self.pwm.set_pwm(self.servo_pin,0,self.servo_min)
+        elif steeringAngle < self.servo_middle:
             my_queue.put(9) #for turning left
-	    #my_queue.put(6)
+            #my_queue.put(6)
             #self.pwm.set_pwm(self.servo_pin,0,self.servo_max)
         else:
             '''
-            steeringAngle == 0, continue forward
+            steeringAngle == self.servo_middle, continue forward
             TODO: Add logic to check check distance z and translation to decide to continue
             forward or turn and somehow get on track
             '''
-	    self.pwm.set_pwm(self.drive_pwm_pin,0,self.drive_speed)
-	    #self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
+            if os.name == "posix":
+                self.pwm.set_pwm(self.drive_pwm_pin,0,self.drive_speed)
+            #self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
             my_queue.put(6)
                 
 #         if Translation.Point.z <= self.backwardZThreshold:
