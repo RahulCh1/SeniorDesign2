@@ -39,7 +39,10 @@ class Navigation(object):
         self.yRotationNegativeThreshold = -0.075
         self.yRotationPositiveThreshold = 0.075
         self.yRotationOffset = 0.1
-        
+
+        self.yRotationMin = -2.53
+        self.yRotationMax = 2.53
+
         
         print "Navigation started! \n"
         
@@ -56,24 +59,31 @@ class Navigation(object):
         12 bits = 4096
         Testing servo with function generator: 0.9 ms to 2.0 ms
         16.67/4096 = 1.1/x
+
+        Wheels turn about +/- 40 degrees => 2.53*(40/180) = 0.562
+        
         '''
 	self.servo_pin = 8
-	self.servo_min = 270
-	self.servo_max = 442
-	self.servo_default = 356 
+	self.servo_min = 280 #270
+	self.servo_max = 430 #442
+	self.servo_range = self.servo_max - self.servo_min
+	self.servo_middle = self.servo_range/2 + self.servo_min #356 
+        print "Middle: " + str(self.servo_middle)
+	self.marker_leftmax_threshold = -0.562
+	self.marker_rightmax_threshold = 0.562
 	
 	'''
 	Drive Motor
 	'''
 	self.drive_direction = 13
 	self.drive_pwm_pin = 5
-	self.drive_speed = 4000
+	self.drive_speed = 1500
 	
 	try:
 		self.pwm = Adafruit_PCA9685.PCA9685()
 		self.pwm.set_pwm_freq(60)
 		print "Resetting servo to default..."
-		self.pwm.set_pwm(self.servo_pin,0,self.servo_default)
+		self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
 		time.sleep(1)
 		print "Resetting servo done!"
 		
@@ -85,13 +95,13 @@ class Navigation(object):
     
     def GetParsedJSON(self):
         return self.piped_json.GetParsedJSON()
-    
-    
+        
+
     def Exit(self):
         print "Exitting Navigation..."
         self.piped_json.KillProcess()
 	print "Resetting servo to default position..."
-	self.pwm.set_pwm(self.servo_pin,0,self.servo_default)
+	self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
         self.exitMain = True
         
     '''
@@ -104,7 +114,7 @@ class Navigation(object):
             -2.53 to 2.53
             CCW is negative
             CW is positive
-            180 degrees (from vector perpendicular to camera) is -2.53 and 2.53
+            +/- 180 degrees (from vector perpendicular to camera) is -2.53 and 2.53
             0   degrees (from vector perpendicular to camera) is  0.0
         
         Map y range [-2.53 to 2.53] to [0 degrees to 360 degrees]
@@ -119,10 +129,24 @@ class Navigation(object):
         
         if yRotation >= self.yRotationNegativeThreshold and yRotation <= self.yRotationPositiveThreshold:
             return 0 #steering is on point
-        elif yRotation < -0.1:
-            return (yRotation/-2.53)*-180
+        elif yRotation <= self.marker_leftmax_threshold:
+            return self.servo_min
+        elif yRotation >= self.marker_rightmax_threshold:
+            return self.servo_max
         else:
-            return (yRotation/2.53)*180
+            '''
+            Return marker rotation mapped to servo rotation number
+            '''
+            #turn left
+            if yRotation <= self.yRotationNegativeThreshold:
+                servoSteering = int(self.servo_min+(self.servo_range/2)*(yRotation/(self.marker_rightmax_threshold-self.yRotationPositiveThreshold)))                
+                print "Left: " + str(servoSteering)
+                return servoSteering
+            #turn right
+            elif yRotation >= self.yRotationPositiveThreshold:
+                servoSteering = int(self.servo_middle+(self.servo_range/2)*(yRotation/(self.marker_rightmax_threshold-self.yRotationPositiveThreshold))) 
+                print "Right: " + str(servoSteering)
+                return servoSteering
         
     
     '''
@@ -175,14 +199,16 @@ class Navigation(object):
         Resolution to this approach: Use boolean flag on Navigation which is set when method thread runs out of time to execute
         Alternative approach issue: Cannot change C++ code to send blanks because MDetector.detect() is also blocking
         '''
-        
+        self.pwm.set_pwm(self.servo_pin,0,steeringAngle)
         
         if steeringAngle > 0:
             my_queue.put(7) #for turning right
-	    self.pwm.set_pwm(self.servo_pin,0,self.servo_min)
+	    #my_queue.put(6)
+	    #self.pwm.set_pwm(self.servo_pin,0,self.servo_min)
         elif steeringAngle < 0:
             my_queue.put(9) #for turning left
-            self.pwm.set_pwm(self.servo_pin,0,self.servo_max)
+	    #my_queue.put(6)
+            #self.pwm.set_pwm(self.servo_pin,0,self.servo_max)
         else:
             '''
             steeringAngle == 0, continue forward
@@ -190,7 +216,7 @@ class Navigation(object):
             forward or turn and somehow get on track
             '''
 	    self.pwm.set_pwm(self.drive_pwm_pin,0,self.drive_speed)
-	    self.pwm.set_pwm(self.servo_pin,0,self.servo_default)
+	    #self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
             my_queue.put(6)
                 
 #         if Translation.Point.z <= self.backwardZThreshold:
