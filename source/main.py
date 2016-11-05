@@ -21,7 +21,92 @@ if __name__ == '__main__':
     
     #start navigation
     myNavigation = Navigation()
-        
+    servo_middle = 402
+    pulseTime = 0.5
+    
+    print "servo_max: " + str(myNavigation.servo_max)
+    print "servo_min: " + str(myNavigation.servo_min)
+
+    '''
+    myNavigation.pwm.set_pwm(myNavigation.servo_pin,0,myNavigation.servo_middle)
+    time.sleep(3)
+    myNavigation.pwm.set_pwm(myNavigation.servo_pin,0,myNavigation.servo_min)
+    time.sleep(3)
+    myNavigation.pwm.set_pwm(myNavigation.servo_pin,0,myNavigation.servo_max)
+    time.sleep(3)
+    '''
+    
+    
+    print "Center and right\n"
+
+    '''
+    #center 525 humming, 510 no hum
+    myNavigation.Steer(servo_middle)
+    time.sleep(3)
+    myNavigation.Steer(myNavigation.servo_max+70+15)
+    print "New Max: " + str(myNavigation.servo_max+70+15)
+    time.sleep(10)
+    '''
+    #310 to 510
+    for i in xrange(510,300,-10):
+        print "Steering: " + str(i) + "\n"
+        myNavigation.Steer(i)
+        time.sleep(0.5)
+    
+    
+    '''
+    print "Starting right turn"
+    myNavigation.Forward()
+    time.sleep(7)
+    myNavigation.Stop()
+    '''
+    
+    
+    '''
+    print "Left\n"
+    #right
+    myNavigation.pwm.set_pwm(myNavigation.servo_pin,0,myNavigation.servo_min)
+    time.sleep(pulseTime)
+    myNavigation.pwm.set_pwm(myNavigation.servo_pin,0,0)
+    time.sleep(3)
+
+    print "Right\n"
+    #left
+    myNavigation.pwm.set_pwm(myNavigation.servo_pin,0,myNavigation.servo_max)
+    time.sleep(pulseTime)
+    myNavigation.pwm.set_pwm(myNavigation.servo_pin,0,0)
+    time.sleep(3)
+    '''
+    
+    print "***Done!***"
+    '''
+    myNavigation.pwm.set_pwm(myNavigation.drive_pwm_pin,0,1500)
+    time.sleep(15)
+    myNavigation.pwm.set_pwm(myNavigation.drive_pwm_pin,0,0)
+    time.sleep(2)
+    '''
+    
+    '''
+    print "Go Left"
+    myNavigation.pwm.set_pwm(myNavigation.servo_pin,0,myNavigation.servo_min)
+    time.sleep(3)
+    myNavigation.pwm.set_pwm(myNavigation.drive_pwm_pin,0,1500)
+    time.sleep(5)
+    myNavigation.pwm.set_pwm(myNavigation.drive_pwm_pin,0,0)
+    time.sleep(2)
+
+    print "Go Right"
+    myNavigation.pwm.set_pwm(myNavigation.servo_pin,0,myNavigation.servo_max)
+    time.sleep(3)
+    myNavigation.pwm.set_pwm(myNavigation.drive_pwm_pin,0,1500)
+    time.sleep(5)
+    myNavigation.pwm.set_pwm(myNavigation.drive_pwm_pin,0,0)
+    time.sleep(2)
+    '''
+    
+    myNavigation.Exit()
+    sys.exit()
+
     #start gui
     myGui = gui.Display(myNavigation)
     my_queue = Queue.Queue()

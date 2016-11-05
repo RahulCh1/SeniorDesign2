@@ -23,6 +23,19 @@ class Navigation(object):
     '''
     
     def __init__(self):
+        '''
+        Set up GPIO pins
+        Pin 12: Ground to turn off voltage regulator
+        Pin 13: Reverse drive motor
+        '''
+        self.io = io
+        self.voltage_reg_pin = 12
+        self.reverse_drive_pin = 13
+        self.io.setup(self.voltage_reg_pin,self.io.OUT)
+        self.io.setup(self.reverse_drive_pin,self.io.OUT)
+
+        self.io.output(self.voltage_reg_pin,0)
+        self.io.output(self.reverse_drive_pin,0)
         
         '''
         Ranges:
@@ -70,7 +83,7 @@ class Navigation(object):
             exeName = "aruco_simple.exe"
             exePath = "C:/Users/Rahul/Desktop/ArUCO/SeniorDesign2ArUCO/build/bin/Release"
         
-        self.piped_json = PipedJSON(exeName,exePath)
+        #self.piped_json = PipedJSON(exeName,exePath)
         
     	'''
     	PWM Driver
@@ -82,6 +95,7 @@ class Navigation(object):
         Wheels turn about +/- 40 degrees => 2.53*(40/180) = 0.562
         
         '''
+    	self.servo_turnTime = 0.5 #max time for servo to finish turning
         self.servo_pin = 8
         self.servo_min = 280 #270
         self.servo_max = 430 #442
@@ -98,6 +112,8 @@ class Navigation(object):
         self.drive_direction = 13
         self.drive_pwm_pin = 5
         self.drive_speed = 1500
+        
+        
         
         self.exitMain = False
 
@@ -257,18 +273,35 @@ class Navigation(object):
     '''
     def MinimizeError(self):
         pass
-    
+
+    def VoltageReg_ON(self):
+        self.io.output(self.voltage_reg_pin,1)
+
+    def VoltageReg_OFF(self):
+        self.io.output(self.voltage_reg_pin,0)
+        
+    def Steer(self,steeringAngle):
+        if os.name == "posix":
+            self.pwm.set_pwm(self.servo_pin,0,steeringAngle)
+            time.sleep(self.servo_turnTime)
+            self.pwm.set_pwm(self.servo_pin,0,0)
+
+    def Forward(self):
+        if os.name == "posix":
+            self.VoltageReg_ON();
+            self.pwm.set_pwm(self.drive_pwm_pin,0,self.drive_speed)
+
+    def Stop(self):
+        if os.name == "posix":
+            self.VoltageReg_OFF();
+            self.pwm.set_pwm(self.drive_pwm_pin,0,0)
+            
     def TurnLeft(self,SteeringAngle):
         pass
     
     def TurnRight(self,SteeringAngle):
         pass
     
-    def Stop(self):
-        pass
-    
-    def Forward(self,Speed):
-        pass
     
     '''
     Check with compass if car turned 90 degrees clockwise or counterclockwise since enclosed loop 
