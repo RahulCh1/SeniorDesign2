@@ -41,8 +41,8 @@ class Navigation(object):
         self.backwardZThreshold = 0.7
         self.forwardZThreshold = 2
         
-        self.yRotationNegativeThreshold = -0.075
-        self.yRotationPositiveThreshold = 0.075
+        self.yRotationNegativeThreshold = -0.1 #-0.075
+        self.yRotationPositiveThreshold = 0.1 #0.075
         
         if os.name == "posix":
             self.yRotationOffset = 0.1
@@ -88,7 +88,8 @@ class Navigation(object):
         self.servo_range = self.servo_max - self.servo_min
         self.servo_middle = self.servo_range/2 + self.servo_min #356 
         print "Middle: " + str(self.servo_middle)
-        self.marker_leftmax_threshold = -0.562
+        
+	self.marker_leftmax_threshold = -0.562
         self.marker_rightmax_threshold = 0.562
         
         '''
