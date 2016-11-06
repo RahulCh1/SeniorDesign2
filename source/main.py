@@ -42,7 +42,8 @@ if __name__ == '__main__':
         if time.time() - startTime >= MarkerTimeout:
             my_queue.put(5) #put 5 for stop sign, immediately read by DisplayImageByNumber below so queue does not overflow
             if os.name == "posix":
-                myNavigation.pwm.set_pwm(myNavigation.drive_pwm_pin,0,0)
+                myNavigation.Stop()
+                
         if not bufferedPipeThread.isAlive():
             bufferedPipeThread = threading.Thread(target=myNavigation.GetSteeringAngleRotationTranslation,args=(my_queue,))
             bufferedPipeThread.start()

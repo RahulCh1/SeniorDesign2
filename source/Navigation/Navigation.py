@@ -51,7 +51,27 @@ class Navigation(object):
 
         self.yRotationMin = -2.53
         self.yRotationMax = 2.53
-
+        
+        '''
+        Integers correlated to directional arrow pictures
+        '''
+        self.ForwardImage = 6
+        self.RightImage = 7
+        self.LeftImage = 9
+        
+        '''
+        Marker IDs correlated to driving instruction
+        '''
+        self.id_start = 1
+        self.id_forward = 6
+        self.id_left = 7
+        self.id_right = 8
+        self.id_stop1 = 1
+        self.id_stop2 = 2
+        self.id_stop3 = 3
+        self.id_stop4 = 4
+        self.id_stop = 5
+        
         
         print "Navigation started! \n"
         
@@ -72,7 +92,7 @@ class Navigation(object):
         
         self.piped_json = PipedJSON(exeName,exePath)
         
-    	'''
+        '''
     	PWM Driver
         60 Hz => 16.67 ms
         12 bits = 4096
@@ -89,7 +109,7 @@ class Navigation(object):
         self.servo_middle = self.servo_range/2 + self.servo_min #356 
         print "Middle: " + str(self.servo_middle)
         
-	self.marker_leftmax_threshold = -0.562
+        self.marker_leftmax_threshold = -0.562
         self.marker_rightmax_threshold = 0.562
         
         '''
@@ -223,15 +243,15 @@ class Navigation(object):
         Resolution to this approach: Use boolean flag on Navigation which is set when method thread runs out of time to execute
         Alternative approach issue: Cannot change C++ code to send blanks because MDetector.detect() is also blocking
         '''
-        if os.name == "posix":
-            self.pwm.set_pwm(self.servo_pin,0,steeringAngle)
+        
+        self.Steer(steeringAngle)
         
         if steeringAngle > self.servo_middle:
-            my_queue.put(7) #for turning right
+            my_queue.put(self.RightImage) #for turning right
         #my_queue.put(6)
         #self.pwm.set_pwm(self.servo_pin,0,self.servo_min)
         elif steeringAngle < self.servo_middle:
-            my_queue.put(9) #for turning left
+            my_queue.put(self.LeftImage) #for turning left
             #my_queue.put(6)
             #self.pwm.set_pwm(self.servo_pin,0,self.servo_max)
         else:
@@ -240,10 +260,9 @@ class Navigation(object):
             TODO: Add logic to check check distance z and translation to decide to continue
             forward or turn and somehow get on track
             '''
-            if os.name == "posix":
-                self.pwm.set_pwm(self.drive_pwm_pin,0,self.drive_speed)
+            self.Forward(self.drive_speed)
             #self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
-            my_queue.put(6)
+            my_queue.put(self.ForwardImage)
                 
 #         if Translation.Point.z <= self.backwardZThreshold:
 #             my_queue.put(8) #for going backward
@@ -252,23 +271,23 @@ class Navigation(object):
 #         else:
 #             my_queue.put(5) #for default stop sign
     
-    '''
-    Maybe unnecessary to find error. Can just get angle difference and act on that.
-    '''
-    def MinimizeError(self):
+    def TurnLeft90(self,SteeringAngle):
         pass
     
-    def TurnLeft(self,SteeringAngle):
+    def TurnRight90(self,SteeringAngle):
         pass
     
-    def TurnRight(self,SteeringAngle):
-        pass
+    def Steer(self,SteeringAngle):
+        if os.name == "posix":
+            self.pwm.set_pwm(self.servo_pin,0,SteeringAngle)
     
     def Stop(self):
-        pass
+        if os.name == "posix":
+            self.pwm.set_pwm(self.drive_pwm_pin,0,0)
     
     def Forward(self,Speed):
-        pass
+        if os.name == "posix":
+            self.pwm.set_pwm(self.drive_pwm_pin,0,Speed)
     
     '''
     Check with compass if car turned 90 degrees clockwise or counterclockwise since enclosed loop 
