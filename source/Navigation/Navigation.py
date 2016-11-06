@@ -97,13 +97,12 @@ class Navigation(object):
         '''
     	self.servo_turnTime = 0.5 #max time for servo to finish turning
         self.servo_pin = 8
-        self.servo_min = 280 #270
-        self.servo_max = 430 #442
+        self.servo_min = 310 #280 #270
+        self.servo_max = 510 #442
         self.servo_range = self.servo_max - self.servo_min
-        self.servo_middle = self.servo_range/2 + self.servo_min #356 
-        print "Middle: " + str(self.servo_middle)
+        self.servo_middle = 402 #self.servo_range/2 + self.servo_min #356 
         
-	self.marker_leftmax_threshold = -0.562
+        self.marker_leftmax_threshold = -0.562
         self.marker_rightmax_threshold = 0.562
         
         '''
@@ -141,7 +140,12 @@ class Navigation(object):
         if os.name == "posix":
             self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
         self.exitMain = True
-        
+    
+    def TestSteeringLimits(self):
+        for i in xrange(510,300,-10):
+            print "Steering: " + str(i) + "\n"
+            self.Steer(i)
+            time.sleep(0.5)
     '''
     Might Implement later
     Get the angle to steer in depending on angle between axis of Camera and Marker
@@ -296,11 +300,17 @@ class Navigation(object):
             self.VoltageReg_OFF();
             self.pwm.set_pwm(self.drive_pwm_pin,0,0)
             
-    def TurnLeft(self,SteeringAngle):
-        pass
+    def TurnLeft(self,leftTurnTime):
+        self.Steer(310);
+        self.Forward();
+        time.sleep(leftTurnTime)
+        self.Stop()
     
-    def TurnRight(self,SteeringAngle):
-        pass
+    def TurnRight(self,rightTurnTime):
+        self.Steer(510);
+        self.Forward();
+        time.sleep(rightTurnTime)
+        self.Stop()
     
     
     '''
