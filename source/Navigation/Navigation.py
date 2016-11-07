@@ -53,8 +53,8 @@ class Navigation(object):
         self.backwardZThreshold = 0.7
         self.forwardZThreshold = 2
         
-        self.yRotationNegativeThreshold = -0.1 #-0.075
-        self.yRotationPositiveThreshold = 0.1 #0.075
+        self.yRotationNegativeThreshold = -0.2 #-0.075
+        self.yRotationPositiveThreshold = 0.2 #0.075
         
         if os.name == "posix":
             self.yRotationOffset = 0.1
@@ -82,7 +82,7 @@ class Navigation(object):
             exeName = "aruco_simple.exe"
             exePath = "C:/Users/Rahul/Desktop/ArUCO/SeniorDesign2ArUCO/build/bin/Release"
         
-        #self.piped_json = PipedJSON(exeName,exePath)
+        self.piped_json = PipedJSON(exeName,exePath)
         
     	'''
     	PWM Driver
@@ -94,7 +94,7 @@ class Navigation(object):
         Wheels turn about +/- 40 degrees => 2.53*(40/180) = 0.562
         
         '''
-    	self.servo_turnTime = 0.5 #max time for servo to finish turning
+    	self.servo_turnTime = 0.1 #max time for servo to finish turning
         self.servo_pin = 8
         self.servo_min = 310 #280 #270
         self.servo_max = 510 #442
@@ -137,7 +137,9 @@ class Navigation(object):
         self.piped_json.KillProcess()
         print "Resetting servo to default position..."
         if os.name == "posix":
-            self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
+            self.Steer(self.servo_middle)
+            time.sleep(0.5)
+            self.pwm.set_pwm(self.servo_pin,0,0)
         self.exitMain = True
     
     def TestSteeringLimits(self):
@@ -178,17 +180,14 @@ class Navigation(object):
             '''
             Return marker rotation mapped to servo rotation number
             '''
-            print "Rotation: " + str(yRotation)
             
             #turn left
             if yRotation <= self.yRotationNegativeThreshold:
                 servoSteering = int(self.servo_middle+(self.servo_range/2)*(yRotation/(self.marker_rightmax_threshold-self.yRotationPositiveThreshold)))                
-                print "Left: " + str(servoSteering)
                 return servoSteering
             #turn right
             elif yRotation >= self.yRotationPositiveThreshold:
                 servoSteering = int(self.servo_middle+(self.servo_range/2)*(yRotation/(self.marker_rightmax_threshold-self.yRotationPositiveThreshold))) 
-                print "Right: " + str(servoSteering)
                 return servoSteering
         
     
@@ -217,7 +216,7 @@ class Navigation(object):
             
         Translation = Vector3D(Point3D(parsed_JSON["Markers"][0]["T"]["x"],parsed_JSON["Markers"][0]["T"]["y"],parsed_JSON["Markers"][0]["T"]["z"]))
         Rotation = Vector3D(Point3D(parsed_JSON["Markers"][0]["R"]["x"],parsed_JSON["Markers"][0]["R"]["y"],parsed_JSON["Markers"][0]["R"]["z"]))
-        
+        markerID = parsed_JSON["Markers"][0]["ID"]
         
         '''
         Get steering angle
@@ -242,8 +241,29 @@ class Navigation(object):
         Resolution to this approach: Use boolean flag on Navigation which is set when method thread runs out of time to execute
         Alternative approach issue: Cannot change C++ code to send blanks because MDetector.detect() is also blocking
         '''
+
+        if markerID == 6:
+            self.Steer(self.servo_middle)
+            self.Forward()
+            my_queue.put(6)
+        elif markerID == 5:
+            self.Steer(self.servo_min)
+            my_queue.put(9)
+        elif markerID == 7:
+            self.Steer(self.servo_max)
+            my_queue.put(7)
+        
+
+        '''
         if os.name == "posix":
-            self.pwm.set_pwm(self.servo_pin,0,steeringAngle)
+            if steeringAngle > self.servo_middle:
+                self.Steer(self.servo_min)
+            elif steeringAngle < self.servo_middle:
+                self.Steer(self.servo_max)
+            else:
+                self.Steer(self.servo_middle)
+                self.Forward()
+            #self.pwm.set_pwm(self.servo_pin,0,steeringAngle)
         
         if steeringAngle > self.servo_middle:
             my_queue.put(7) #for turning right
@@ -254,16 +274,17 @@ class Navigation(object):
             #my_queue.put(6)
             #self.pwm.set_pwm(self.servo_pin,0,self.servo_max)
         else:
-            '''
-            steeringAngle == self.servo_middle, continue forward
-            TODO: Add logic to check check distance z and translation to decide to continue
-            forward or turn and somehow get on track
-            '''
+            
+            #steeringAngle == self.servo_middle, continue forward
+            #TODO: Add logic to check check distance z and translation to decide to continue
+            #forward or turn and somehow get on track
+            
             if os.name == "posix":
-                self.pwm.set_pwm(self.drive_pwm_pin,0,self.drive_speed)
-            #self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
+                #self.Forward()
+                #self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
+                pass
             my_queue.put(6)
-                
+        '''     
 #         if Translation.Point.z <= self.backwardZThreshold:
 #             my_queue.put(8) #for going backward
 #         if Translation.Point.z >= self.forwardZThreshold:
@@ -286,6 +307,11 @@ class Navigation(object):
     def Steer(self,steeringAngle):
         if os.name == "posix":
             self.pwm.set_pwm(self.servo_pin,0,steeringAngle)
+
+
+    def Steer2(self,steeringAngle):
+        if os.name == "posix":
+            self.pwm.set_pwm(self.servo_pin,0,steeringAngle)
             time.sleep(self.servo_turnTime)
             self.pwm.set_pwm(self.servo_pin,0,0)
 
@@ -299,7 +325,7 @@ class Navigation(object):
             self.VoltageReg_OFF();
             self.pwm.set_pwm(self.drive_pwm_pin,0,0)
             
-    def TurnLeft(self,leftTurnTime):
+    def TurnLeftCompass(self,leftTurnTime):
         timeLimit = time.time() + leftTurnTime
         
         initialDegree = self.GetCompass()
@@ -312,9 +338,15 @@ class Navigation(object):
             print "InitialDegree:" + str(initialDegree) + ", Bearing: " + str(self.compass.Compass.bearing)
             
         self.Stop()
-    
+        
+    def TurnLeft(self,leftTurnTime):
+        self.Steer(self.servo_min);
+        self.Forward();
+        time.sleep(rightTurnTime)
+        self.Stop()
+        
     def TurnRight(self,rightTurnTime):
-        self.Steer(510);
+        self.Steer(self.servo_max);
         self.Forward();
         time.sleep(rightTurnTime)
         self.Stop()

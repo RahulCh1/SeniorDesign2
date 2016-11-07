@@ -21,15 +21,18 @@ if __name__ == '__main__':
     
     #start navigation
     myNavigation = Navigation()
-	
+
+    '''
     myNavigation.Forward()
-    time.sleep(5)
-    myNavigation.TurnRight(0.9)
+    time.sleep(2.5)
+    myNavigation.TurnLeft(1.5)
+    
     myNavigation.Steer(myNavigation.servo_middle)
 	
     myNavigation.Exit()
     sys.exit()
-
+    '''
+    
     #start gui
     myGui = gui.Display(myNavigation)
     my_queue = Queue.Queue()
@@ -50,7 +53,8 @@ if __name__ == '__main__':
         if time.time() - startTime >= MarkerTimeout:
             my_queue.put(5) #put 5 for stop sign, immediately read by DisplayImageByNumber below so queue does not overflow
             if os.name == "posix":
-                myNavigation.pwm.set_pwm(myNavigation.drive_pwm_pin,0,0)
+                myNavigation.Stop()
+                #print "Stopping drive motor!"
         if not bufferedPipeThread.isAlive():
             bufferedPipeThread = threading.Thread(target=myNavigation.GetSteeringAngleRotationTranslation,args=(my_queue,))
             bufferedPipeThread.start()
@@ -60,7 +64,8 @@ if __name__ == '__main__':
         #look into threading the navigation/buffered pipe or use unbuffered pipe from POpen
         
         if not my_queue.empty():
-            myGui.DisplayImageByNumber(my_queue.get())
+            markerID = my_queue.get()
+            myGui.DisplayImageByNumber(markerID)
         
         #updateGui outside so GUI buttons work unconditionally
         myGui.updateGui()        
