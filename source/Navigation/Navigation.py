@@ -28,14 +28,13 @@ class Navigation(object):
         Pin 12: Ground to turn off voltage regulator
         Pin 13: Reverse drive motor
         '''
-        self.io = io
         self.voltage_reg_pin = 12
         self.reverse_drive_pin = 13
-        self.io.setup(self.voltage_reg_pin,self.io.OUT)
-        self.io.setup(self.reverse_drive_pin,self.io.OUT)
+        io.setup(self.voltage_reg_pin,io.OUT)
+        io.setup(self.reverse_drive_pin,io.OUT)
 
-        self.io.output(self.voltage_reg_pin,0)
-        self.io.output(self.reverse_drive_pin,0)
+        io.output(self.voltage_reg_pin,0)
+        io.output(self.reverse_drive_pin,0)
         
         '''
         Ranges:
@@ -100,7 +99,7 @@ class Navigation(object):
         self.servo_min = 310 #280 #270
         self.servo_max = 510 #442
         self.servo_range = self.servo_max - self.servo_min
-        self.servo_middle = 402 #self.servo_range/2 + self.servo_min #356 
+        self.servo_middle = 408 #self.servo_range/2 + self.servo_min #356 
         
         self.marker_leftmax_threshold = -0.562
         self.marker_rightmax_threshold = 0.562
@@ -279,10 +278,10 @@ class Navigation(object):
         pass
 
     def VoltageReg_ON(self):
-        self.io.output(self.voltage_reg_pin,1)
+        io.output(self.voltage_reg_pin,1)
 
     def VoltageReg_OFF(self):
-        self.io.output(self.voltage_reg_pin,0)
+        io.output(self.voltage_reg_pin,0)
         
     def Steer(self,steeringAngle):
         if os.name == "posix":

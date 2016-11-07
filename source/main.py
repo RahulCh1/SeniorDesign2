@@ -21,9 +21,12 @@ if __name__ == '__main__':
     
     #start navigation
     myNavigation = Navigation()
-
-    myNavigation.TurnLeft(3.5)
-        
+	
+    myNavigation.Forward()
+    time.sleep(5)
+    myNavigation.TurnRight(0.9)
+    myNavigation.Steer(myNavigation.servo_middle)
+	
     myNavigation.Exit()
     sys.exit()
 
