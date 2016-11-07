@@ -15,7 +15,7 @@ from Vector import Vector3D, Point3D
 import Queue
 import thread
 import time
-
+import Compass
 
 class Navigation(object):
     '''
@@ -300,9 +300,17 @@ class Navigation(object):
             self.pwm.set_pwm(self.drive_pwm_pin,0,0)
             
     def TurnLeft(self,leftTurnTime):
+        timeLimit = time.time() + leftTurnTime
+        
+        initialDegree = self.GetCompass()
+        
         self.Steer(310);
         self.Forward();
-        time.sleep(leftTurnTime)
+        
+        while self.CheckIfTurned90(initialDegree) or time.time() > timeLimit:
+            time.sleep(0.05)
+            print "InitialDegree:" + str(initialDegree) + ", Bearing: " + str(self.compass.Compass.bearing)
+            
         self.Stop()
     
     def TurnRight(self,rightTurnTime):
@@ -315,12 +323,17 @@ class Navigation(object):
     '''
     Check with compass if car turned 90 degrees clockwise or counterclockwise since enclosed loop 
     '''
-    def CheckIfTurned90(self):
-        #GetCompass here
-        pass
+    def CheckIfTurned90(self,initialDegree):
+        if abs(initialDegree - self.GetCompass()) >= 90:
+            return True
+        else:
+            return False
+    
+    def InitializeCompass(self):
+        self.compass = Compass()
     
     def GetCompass(self):
-        pass
+        self.compass.Compass.getBearing()
     
     def DisplayImage(self,ImageNumber):
         pass
