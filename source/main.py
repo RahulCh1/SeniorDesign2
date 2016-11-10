@@ -24,11 +24,11 @@ if __name__ == '__main__':
 
     '''
     myNavigation.Forward()
-    time.sleep(2.5)
-    myNavigation.TurnLeft(1.5)
+    #time.sleep(2.5)
+    myNavigation.TurnLeft(0.9)
     
     myNavigation.Steer(myNavigation.servo_middle)
-	
+    myNavigation.Stop()	
     myNavigation.Exit()
     sys.exit()
     '''

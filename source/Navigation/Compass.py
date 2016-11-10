@@ -51,9 +51,9 @@ class Compass(object):
         return self.read_word_2c(5) * self.scale
         
     def getBearing(self):
-        x_out = self.readX()
-        y_out = self.readY()
-        self.bearing  = math.atan2(y_out, x_out) 
+        self.x_out = self.readX()
+        self.y_out = self.readY()
+        self.bearing  = math.atan2(self.y_out, self.x_out) 
         if (self.bearing < 0):
             self.bearing += 2 * math.pi
         

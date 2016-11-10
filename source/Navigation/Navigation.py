@@ -13,10 +13,10 @@ if os.name == "posix": #checks if running on Pi
 from PipedJSON import PipedJSON
 from Vector import Vector3D, Point3D
 import Queue
-import thread
+import threading
 import time
-import Compass
-
+from Compass import Compass
+import sys
 class Navigation(object):
     '''
     classdocs
@@ -81,7 +81,10 @@ class Navigation(object):
         else:
             exeName = "aruco_simple.exe"
             exePath = "C:/Users/Rahul/Desktop/ArUCO/SeniorDesign2ArUCO/build/bin/Release"
-        
+
+        '''
+        Comment out line to prevent OpenCV from opening
+        '''
         self.piped_json = PipedJSON(exeName,exePath)
         
     	'''
@@ -97,7 +100,7 @@ class Navigation(object):
     	self.servo_turnTime = 0.1 #max time for servo to finish turning
         self.servo_pin = 8
         self.servo_min = 310 #280 #270
-        self.servo_max = 510 #442
+        self.servo_max = 510 #442 #510
         self.servo_range = self.servo_max - self.servo_min
         self.servo_middle = 408 #self.servo_range/2 + self.servo_min #356 
         
@@ -109,9 +112,14 @@ class Navigation(object):
         '''
         self.drive_direction = 13
         self.drive_pwm_pin = 5
-        self.drive_speed = 1500
+        self.drive_speed = 1000
         
-        
+        '''
+        Thread for stopping servo PWM
+        '''
+        self.startSteerTime = 0
+        self.steeringTimeout = 0.3 #time for servo to finish rotating
+        self.thread_servo_pwm = 0
         
         self.exitMain = False
 
@@ -189,7 +197,20 @@ class Navigation(object):
             elif yRotation >= self.yRotationPositiveThreshold:
                 servoSteering = int(self.servo_middle+(self.servo_range/2)*(yRotation/(self.marker_rightmax_threshold-self.yRotationPositiveThreshold))) 
                 return servoSteering
-        
+
+    def GetClosestMarker(self,parsed_JSON):
+        closestMarkerNum = 0
+        numberOfMarkers = len(parsed_JSON["Markers"])
+        if numberOfMarkers == 1:
+            return 0
+        elif numberOfMarkers > 1:
+            for num in range(1,numberOfMarkers):
+		#print "num: " + str(num)
+		#print "closest: " + str(parsed_JSON["Markers"][closestMarkerNum]["T"]["z"])
+		#print "Marker at num: " + str(parsed_JSON["Markers"][num]["T"]["z"])
+                if parsed_JSON["Markers"][closestMarkerNum]["T"]["z"] > parsed_JSON["Markers"][num]["T"]["z"]:
+                    closestMarkerNum = num
+            return closestMarkerNum
     
     '''
     Get the steering angle (in the future) based on the Rotation and Translation vector from the center of the Camera to center of Marker
@@ -213,11 +234,13 @@ class Navigation(object):
             print "Exitting all..."
             self.Exit()
             thread.exit()
-            
-        Translation = Vector3D(Point3D(parsed_JSON["Markers"][0]["T"]["x"],parsed_JSON["Markers"][0]["T"]["y"],parsed_JSON["Markers"][0]["T"]["z"]))
-        Rotation = Vector3D(Point3D(parsed_JSON["Markers"][0]["R"]["x"],parsed_JSON["Markers"][0]["R"]["y"],parsed_JSON["Markers"][0]["R"]["z"]))
-        markerID = parsed_JSON["Markers"][0]["ID"]
+
+        closestMarker = self.GetClosestMarker(parsed_JSON)
         
+        Translation = Vector3D(Point3D(parsed_JSON["Markers"][closestMarker]["T"]["x"],parsed_JSON["Markers"][closestMarker]["T"]["y"],parsed_JSON["Markers"][closestMarker]["T"]["z"]))
+        Rotation = Vector3D(Point3D(parsed_JSON["Markers"][closestMarker]["R"]["x"],parsed_JSON["Markers"][closestMarker]["R"]["y"],parsed_JSON["Markers"][closestMarker]["R"]["z"]))
+        markerID = parsed_JSON["Markers"][closestMarker]["ID"]
+        print "Marker: " + str(markerID) + ", " + str(Translation)
         '''
         Get steering angle
         '''
@@ -242,30 +265,35 @@ class Navigation(object):
         Alternative approach issue: Cannot change C++ code to send blanks because MDetector.detect() is also blocking
         '''
 
+        
         if markerID == 6:
             self.Steer(self.servo_middle)
             self.Forward()
             my_queue.put(6)
-        elif markerID == 5:
-            self.Steer(self.servo_min)
-            my_queue.put(9)
         elif markerID == 7:
+            self.Steer(self.servo_min)
+            self.Forward()
+            my_queue.put(9)
+        elif markerID == 8:
             self.Steer(self.servo_max)
             my_queue.put(7)
-        
-
-        '''
-        if os.name == "posix":
-            if steeringAngle > self.servo_middle:
-                self.Steer(self.servo_min)
-            elif steeringAngle < self.servo_middle:
-                self.Steer(self.servo_max)
-            else:
-                self.Steer(self.servo_middle)
-                self.Forward()
-            #self.pwm.set_pwm(self.servo_pin,0,steeringAngle)
-        
-        if steeringAngle > self.servo_middle:
+        elif markerID == 5:
+            self.Stop()
+            self.Steer(self.servo_middle)
+            my_queue.put(1)
+        elif markerID == 2:
+            self.Stop()
+            self.Steer(self.servo_middle)
+            my_queue.put(2)
+        elif markerID == 3:
+            self.Stop()
+            self.Steer(self.servo_middle)
+            my_queue.put(3)
+        elif markerID == 4:
+            self.Stop()
+            self.Steer(self.servo_middle)
+            my_queue.put(4)
+        elif steeringAngle > self.servo_middle:
             my_queue.put(7) #for turning right
         #my_queue.put(6)
         #self.pwm.set_pwm(self.servo_pin,0,self.servo_min)
@@ -273,7 +301,7 @@ class Navigation(object):
             my_queue.put(9) #for turning left
             #my_queue.put(6)
             #self.pwm.set_pwm(self.servo_pin,0,self.servo_max)
-        else:
+        elif False:
             
             #steeringAngle == self.servo_middle, continue forward
             #TODO: Add logic to check check distance z and translation to decide to continue
@@ -284,7 +312,21 @@ class Navigation(object):
                 #self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
                 pass
             my_queue.put(6)
-        '''     
+
+        '''
+        if os.name == "posix":
+            self.Steer(steeringAngle)
+            
+            if steeringAngle > self.servo_middle:
+                self.Steer(self.servo_min)
+            elif steeringAngle < self.servo_middle:
+                self.Steer(self.servo_max)
+            else:
+                self.Steer(self.servo_middle)
+                self.Forward()
+            #self.pwm.set_pwm(self.servo_pin,0,steeringAngle)
+        ''' 
+             
 #         if Translation.Point.z <= self.backwardZThreshold:
 #             my_queue.put(8) #for going backward
 #         if Translation.Point.z >= self.forwardZThreshold:
@@ -310,11 +352,22 @@ class Navigation(object):
 
 
     def Steer2(self,steeringAngle):
-        if os.name == "posix":
+        if os.name == "posix":    
             self.pwm.set_pwm(self.servo_pin,0,steeringAngle)
-            time.sleep(self.servo_turnTime)
-            self.pwm.set_pwm(self.servo_pin,0,0)
+            if self.thread_servo_pwm == 0 or not self.thread_servo_pwm.isAlive():
+                self.thread_servo_pwm = threading.Thread(target=self.StopPWM,args=(time.time()))
+            elif self.thread_servo_pwm.isAlive():
+                self.thread_servo_pwm = threading.Thread(target=self.StopPWM,args=(time.time()))
+            
+            
+    def StopPWM(self,startSteerTime):        
+        while not time.time() - startSteerTime > self.steeringTimeout:            
+            pass
 
+        self.pwm.set_pwm(self.servo_pin,0,510)
+        print "***Stopping PWM!***"
+        sys.stdout.flush()
+    
     def Forward(self):
         if os.name == "posix":
             self.VoltageReg_ON();
