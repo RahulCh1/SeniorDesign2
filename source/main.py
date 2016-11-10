@@ -49,16 +49,20 @@ if __name__ == '__main__':
     #initialize startTime to current time plus 5 so the first attempt has 5 seconds to find a marker
     startTime = time.time() + 5
     MarkerTimeout = 1
+    busyReadThread = threading.Thread(target=myNavigation.piped_json.ReadRawJSON)
     while not myNavigation.exitMain:
-        if time.time() - startTime >= MarkerTimeout:
+        if not busyReadThread.isAlive() and myNavigation.isAsleep:
+            busyReadThread = threading.Thread(target=myNavigation.piped_json.ReadRawJSON)
+            busyReadThread.start()
+        if time.time() - startTime >= MarkerTimeout and not myNavigation.isTurning:
             my_queue.put(5) #put 5 for stop sign, immediately read by DisplayImageByNumber below so queue does not overflow
             if os.name == "posix":
                 myNavigation.Stop()
                 #print "Stopping drive motor!"
-        if not bufferedPipeThread.isAlive():
+        if not bufferedPipeThread.isAlive() and not myNavigation.isAsleep:
             bufferedPipeThread = threading.Thread(target=myNavigation.GetSteeringAngleRotationTranslation,args=(my_queue,))
             bufferedPipeThread.start()
-            startTime = time.time()
+            startTime = time.time() #time saved when ArUCO code is provided in pipe
             #bufferedPipeThread.join()
         
         #look into threading the navigation/buffered pipe or use unbuffered pipe from POpen

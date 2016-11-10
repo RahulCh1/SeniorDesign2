@@ -53,8 +53,9 @@ class Compass(object):
     def getBearing(self):
         self.x_out = self.readX()
         self.y_out = self.readY()
-        self.bearing  = math.atan2(self.y_out, self.x_out) 
-        if (self.bearing < 0):
-            self.bearing += 2 * math.pi
-        
-        return math.degrees(self.bearing)
+        tempBearing  = math.atan2(self.y_out, self.x_out) 
+        if (tempBearing < 0):
+            tempBearing += 2 * math.pi
+
+        self.bearing = math.degrees(tempBearing)
+        return self.bearing

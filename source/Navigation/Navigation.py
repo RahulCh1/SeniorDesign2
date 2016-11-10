@@ -16,7 +16,7 @@ import Queue
 import threading
 import time
 from Compass import Compass
-import sys
+import sys, termios
 class Navigation(object):
     '''
     classdocs
@@ -102,7 +102,7 @@ class Navigation(object):
         self.servo_min = 310 #280 #270
         self.servo_max = 510 #442 #510
         self.servo_range = self.servo_max - self.servo_min
-        self.servo_middle = 408 #self.servo_range/2 + self.servo_min #356 
+        self.servo_middle = 405 #408 #self.servo_range/2 + self.servo_min #356 
         
         self.marker_leftmax_threshold = -0.562
         self.marker_rightmax_threshold = 0.562
@@ -123,13 +123,27 @@ class Navigation(object):
         
         self.exitMain = False
 
+        '''
+        Variable to track last seen marker
+        Boolean to see if Navigation.GetSteeringAngleRotationTranslation() thread is asleep
+        '''
+        self.lastSeenMarker = -1
+        self.lastSeenMarkerZ = -99
+        self.isAsleep = False
+        self.isTurning = False
+
+        '''
+        Initialize Compass
+        '''
+        #self.compass = self.InitializeCompass()
+
         if os.name == "posix":
             try:
                 self.pwm = Adafruit_PCA9685.PCA9685()
                 self.pwm.set_pwm_freq(60)
                 print "Resetting servo to default..."
                 self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
-                time.sleep(1)
+                #time.sleep(1)
                 print "Resetting servo done!"
             except:
                 print "ERROR: PWM Driver not detected"
@@ -148,6 +162,7 @@ class Navigation(object):
             self.Steer(self.servo_middle)
             time.sleep(0.5)
             self.pwm.set_pwm(self.servo_pin,0,0)
+            self.Stop()
         self.exitMain = True
     
     def TestSteeringLimits(self):
@@ -228,7 +243,10 @@ class Navigation(object):
         Translation z: 0 to 2.61
         '''
         try:
-            parsed_JSON = self.piped_json.GetParsedJSON()
+            if self.isAsleep:
+                self.FlushArUcoPipe()
+            else:
+                parsed_JSON = self.piped_json.GetParsedJSON()
         except:
             print "\nERROR: GetParsedJSON() in method GetSteeringAngleRotationTranslation() of Navigation"
             print "Exitting all..."
@@ -239,7 +257,9 @@ class Navigation(object):
         
         Translation = Vector3D(Point3D(parsed_JSON["Markers"][closestMarker]["T"]["x"],parsed_JSON["Markers"][closestMarker]["T"]["y"],parsed_JSON["Markers"][closestMarker]["T"]["z"]))
         Rotation = Vector3D(Point3D(parsed_JSON["Markers"][closestMarker]["R"]["x"],parsed_JSON["Markers"][closestMarker]["R"]["y"],parsed_JSON["Markers"][closestMarker]["R"]["z"]))
+        
         markerID = parsed_JSON["Markers"][closestMarker]["ID"]
+         
         print "Marker: " + str(markerID) + ", " + str(Translation)
         '''
         Get steering angle
@@ -265,34 +285,74 @@ class Navigation(object):
         Alternative approach issue: Cannot change C++ code to send blanks because MDetector.detect() is also blocking
         '''
 
+        '''
+        Put markerID in my_queue() to pass to GUI
+        '''
+        #self.compass.getBearing()
+        #print "compass bearing: " + str(self.compass.bearing)
+
+        '''
+        if self.isTurning:
+            if markerID != 7 and Translation.Point.x >= -0.11 and Translation.Point.x <= 0.18:
+                self.isTurning = False
+                self.Steer(self.servo_middle)
         
+        else:
+        '''
         if markerID == 6:
+            my_queue.put(markerID)
             self.Steer(self.servo_middle)
             self.Forward()
-            my_queue.put(6)
         elif markerID == 7:
-            self.Steer(self.servo_min)
-            self.Forward()
-            my_queue.put(9)
+            if Translation.Point.z <= 0.53 and not self.isTurning and not self.isAsleep:
+                my_queue.put(markerID)
+                #self.Steer(self.servo_min)
+                #self.TurnLeft(2,self.servo_min)
+                self.Steer(330)
+                self.isTurning = True
+                self.isAsleep = True
+
+                self.Forward()
+                time.sleep(8)
+                
+                self.isTurning = False
+                self.isAsleep = False
+                self.Steer(self.servo_middle)
+                #self.TurnLeftCompass(4)
+                
+                print "Turning!"
+            else:
+                #sees marker 7 but not close enough to initiate turn
+                self.Forward()
         elif markerID == 8:
             self.Steer(self.servo_max)
-            my_queue.put(7)
         elif markerID == 5:
             self.Stop()
             self.Steer(self.servo_middle)
-            my_queue.put(1)
-        elif markerID == 2:
-            self.Stop()
-            self.Steer(self.servo_middle)
-            my_queue.put(2)
-        elif markerID == 3:
-            self.Stop()
-            self.Steer(self.servo_middle)
-            my_queue.put(3)
-        elif markerID == 4:
-            self.Stop()
-            self.Steer(self.servo_middle)
-            my_queue.put(4)
+        if self.lastSeenMarker >= 1 and self.lastSeenMarker <= 4 and self.lastSeenMarker != markerID: #check if the marker disappeared off the screen #Translation.Point.z <= 0.323:
+            if self.lastSeenMarkerZ <= 0.4:
+                print "Stopping at marker " + str(self.lastSeenMarker)
+                my_queue.put(self.lastSeenMarker)
+                self.Stop()
+                self.Steer(self.servo_middle)
+                self.isAsleep = True
+                time.sleep(4)
+                self.Forward() #keep going forward until next marker triggers
+                #time.sleep(1) #go forward a little so will stop reading stop
+                self.isAsleep = False
+                #self.FlushArUcoPipe()
+            else:
+                self.Forward()
+        elif markerID >= 1 and markerID <= 4:
+            if Translation.Point.z > 0.5:
+                self.Forward()
+                    
+
+        # set lastSeenMarker
+        self.lastSeenMarker = markerID
+        self.lastSeenMarkerZ = Translation.Point.z
+            
+        '''    
         elif steeringAngle > self.servo_middle:
             my_queue.put(7) #for turning right
         #my_queue.put(6)
@@ -301,31 +361,7 @@ class Navigation(object):
             my_queue.put(9) #for turning left
             #my_queue.put(6)
             #self.pwm.set_pwm(self.servo_pin,0,self.servo_max)
-        elif False:
-            
-            #steeringAngle == self.servo_middle, continue forward
-            #TODO: Add logic to check check distance z and translation to decide to continue
-            #forward or turn and somehow get on track
-            
-            if os.name == "posix":
-                #self.Forward()
-                #self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
-                pass
-            my_queue.put(6)
-
         '''
-        if os.name == "posix":
-            self.Steer(steeringAngle)
-            
-            if steeringAngle > self.servo_middle:
-                self.Steer(self.servo_min)
-            elif steeringAngle < self.servo_middle:
-                self.Steer(self.servo_max)
-            else:
-                self.Steer(self.servo_middle)
-                self.Forward()
-            #self.pwm.set_pwm(self.servo_pin,0,steeringAngle)
-        ''' 
              
 #         if Translation.Point.z <= self.backwardZThreshold:
 #             my_queue.put(8) #for going backward
@@ -377,31 +413,79 @@ class Navigation(object):
         if os.name == "posix":
             self.VoltageReg_OFF();
             self.pwm.set_pwm(self.drive_pwm_pin,0,0)
+
+    def TurnLeftMarker(self,leftTurnTime):
+        timeLimit = time.time() + leftTurnTime
+        
+        initialDegree = self.GetCompassBearing()
+        
+        self.Steer(self.servo_min);
+        self.Forward();
+
+        self.isAsleep = True
+        self.isTurning = True
+        while not self.CheckIfTurned90(initialDegree):# and time.time() <= timeLimit:
+            #time.sleep(0.05)
+            print "InitialDegree:" + str(initialDegree) + ", Bearing: " + str(self.GetCompassBearing())
             
+        self.isAsleep = False
+        self.isTurning = False
+        self.FlushArUcoPipe()
+        
+        self.Stop()
+        self.Steer(self.servo_middle)
+        
+    
     def TurnLeftCompass(self,leftTurnTime):
         timeLimit = time.time() + leftTurnTime
         
-        initialDegree = self.GetCompass()
+        initialDegree = self.GetCompassBearing()
         
-        self.Steer(310);
-        self.Forward();
-        
-        while self.CheckIfTurned90(initialDegree) or time.time() > timeLimit:
-            time.sleep(0.05)
-            print "InitialDegree:" + str(initialDegree) + ", Bearing: " + str(self.compass.Compass.bearing)
-            
-        self.Stop()
-        
-    def TurnLeft(self,leftTurnTime):
         self.Steer(self.servo_min);
         self.Forward();
-        time.sleep(rightTurnTime)
+
+        self.isAsleep = True
+        self.isTurning = True
+        while not self.CheckIfTurned90(initialDegree):# and time.time() <= timeLimit:
+            #time.sleep(0.05)
+            print "InitialDegree:" + str(initialDegree) + ", Bearing: " + str(self.GetCompassBearing())
+            
+        self.isAsleep = False
+        self.isTurning = False
+        self.FlushArUcoPipe()
+        
+        self.Stop()
+        self.Steer(self.servo_middle)
+
+    def FlushArUcoPipe(self):
+        #termios.tcflush(sys.stdin, termios.TCIOFLUSH) #flush stdin so no weird lag
+        #termios.tcflush(self.piped_json.GetStdout(), termios.TCIOFLUSH)
+        #for line in self.piped_json.GetStdout():
+        #    self.piped_json.ReadRawJSON()
+        pass
+    
+    def TurnLeft(self,turnTime,servo_steer = None):
+        if servo_steer is None:
+            servo_steer = self.servo_min
+        self.isAsleep = True
+        self.isTurning = True
+        self.Steer(servo_steer);
+        self.Forward();
+        time.sleep(turnTime)
+        self.isAsleep = False
+        self.isTurning = False
+        self.FlushArUcoPipe()
         self.Stop()
         
-    def TurnRight(self,rightTurnTime):
-        self.Steer(self.servo_max);
+    def TurnRight(self,turnTime,servo_steer = None):
+        if servo_steer is None:
+            servo_steer = self.servo_max
+        self.Steer(servo_steer);
         self.Forward();
-        time.sleep(rightTurnTime)
+        self.isAsleep = True
+        time.sleep(turnTime)
+        self.isAsleep = False
+        self.FlushArUcoPipe()
         self.Stop()
     
     
@@ -409,16 +493,16 @@ class Navigation(object):
     Check with compass if car turned 90 degrees clockwise or counterclockwise since enclosed loop 
     '''
     def CheckIfTurned90(self,initialDegree):
-        if abs(initialDegree - self.GetCompass()) >= 90:
+        if abs(initialDegree - self.GetCompassBearing()) >= 90:
             return True
         else:
             return False
     
     def InitializeCompass(self):
-        self.compass = Compass()
+        return Compass()
     
-    def GetCompass(self):
-        self.compass.Compass.getBearing()
+    def GetCompassBearing(self):
+        return Compass().readY()
     
     def DisplayImage(self,ImageNumber):
         pass

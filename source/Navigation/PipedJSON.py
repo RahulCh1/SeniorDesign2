@@ -37,6 +37,9 @@ class PipedJSON(object):
     
     def ReadRawJSON(self):
         return self.process.openedProcess.stdout.readline().strip() #remove blanks
+
+    def GetStdout(self):
+        return self.process.openedProcess.stdout
     
     '''
     Untested, maybe unnecessary

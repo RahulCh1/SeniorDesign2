@@ -121,17 +121,17 @@ class Display(object):
         elif ImageNumber ==  5:
             label.configure(image = Stop)
             label.image = Stop
-        elif ImageNumber == 7 :
-            label.configure(image = rightArrow)
-            label.image = rightArrow
-        elif ImageNumber == 8 :
-            label.configure(image = downArrow)
-            label.image = downArrow
-        elif ImageNumber == 9:
-            label.configure(image = leftArrow)
-            label.image = leftArrow
         elif ImageNumber == 6:
             label.configure(image = upArrow)
             label.image = upArrow
+        elif ImageNumber == 7 :
+            label.configure(image = leftArrow)
+            label.image = leftArrow
+        elif ImageNumber == 8 :
+            label.configure(image = rightArrow)
+            label.image = rightArrow
+        elif ImageNumber == 9:
+            label.configure(image = downArrow)
+            label.image = downArrow
         
     
