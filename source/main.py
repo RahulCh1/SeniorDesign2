@@ -52,8 +52,14 @@ if __name__ == '__main__':
     busyReadThread = threading.Thread(target=myNavigation.piped_json.ReadRawJSON)
     while not myNavigation.exitMain:
         if not busyReadThread.isAlive() and myNavigation.isAsleep:
-            busyReadThread = threading.Thread(target=myNavigation.piped_json.ReadRawJSON)
-            busyReadThread.start()
+            '''
+            Read to clear the pipe while Navigation is asleep when waiting for audio or turning
+            '''
+            try:
+                busyReadThread = threading.Thread(target=myNavigation.piped_json.ReadRawJSON)
+                busyReadThread.start()
+            except:
+                pass
         if time.time() - startTime >= MarkerTimeout and not myNavigation.isTurning:
             my_queue.put(5) #put 5 for stop sign, immediately read by DisplayImageByNumber below so queue does not overflow
             if os.name == "posix":

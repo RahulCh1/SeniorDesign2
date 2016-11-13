@@ -3,11 +3,13 @@ Created on Sep 27, 2016
 
 @author: Rahul
 '''
-import os
+import sys,os
+sys.path.append('./Audio')
 
 if os.name == "posix": #checks if running on Pi
     import Adafruit_PCA9685
     import RPi.GPIO as io
+    import Audio
     io.setmode(io.BOARD)
     
 from PipedJSON import PipedJSON
@@ -137,18 +139,27 @@ class Navigation(object):
         '''
         #self.compass = self.InitializeCompass()
 
+        '''
+        Initialize PWM Driver and Pygame Audio
+        '''
         if os.name == "posix":
             try:
                 self.pwm = Adafruit_PCA9685.PCA9685()
                 self.pwm.set_pwm_freq(60)
                 print "Resetting servo to default..."
                 self.pwm.set_pwm(self.servo_pin,0,self.servo_middle)
-                #time.sleep(1)
                 print "Resetting servo done!"
             except:
                 print "ERROR: PWM Driver not detected"
                 self.Exit()
                 self.exitMain = False
+
+            try:
+                print "Initializing audio..."
+                self.audioPlayer = Audio.Audio()
+                print "Audio initialized!"
+            except:
+                print "Audio not working! Continuing anyway"
     
     def GetParsedJSON(self):
         return self.piped_json.GetParsedJSON()
@@ -308,12 +319,12 @@ class Navigation(object):
                 my_queue.put(markerID)
                 #self.Steer(self.servo_min)
                 #self.TurnLeft(2,self.servo_min)
-                self.Steer(330)
+                self.Steer(338)
                 self.isTurning = True
                 self.isAsleep = True
 
                 self.Forward()
-                time.sleep(8)
+                time.sleep(9)
                 
                 self.isTurning = False
                 self.isAsleep = False
@@ -330,13 +341,23 @@ class Navigation(object):
             self.Stop()
             self.Steer(self.servo_middle)
         if self.lastSeenMarker >= 1 and self.lastSeenMarker <= 4 and self.lastSeenMarker != markerID: #check if the marker disappeared off the screen #Translation.Point.z <= 0.323:
-            if self.lastSeenMarkerZ <= 0.4:
+            if self.lastSeenMarkerZ <= 0.45:
                 print "Stopping at marker " + str(self.lastSeenMarker)
                 my_queue.put(self.lastSeenMarker)
                 self.Stop()
                 self.Steer(self.servo_middle)
                 self.isAsleep = True
-                time.sleep(4)
+                #time.sleep(4)
+                
+                if self.lastSeenMarker == 1:
+                    self.audioPlayer.playAudioFile("Audio/MorrilD.wav")
+                elif self.lastSeenMarker == 2:
+                    self.audioPlayer.playAudioFile("Audio/ColvinR.wav")
+                elif self.lastSeenMarker == 3:
+                    self.audioPlayer.playAudioFile("Audio/LibraryD.wav")
+                elif self.lastSeenMarker == 4:
+                    self.audioPlayer.playAudioFile("Audio/WhitehurstR.wav")
+                    
                 self.Forward() #keep going forward until next marker triggers
                 #time.sleep(1) #go forward a little so will stop reading stop
                 self.isAsleep = False
