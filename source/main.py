@@ -60,7 +60,7 @@ if __name__ == '__main__':
                 busyReadThread.start()
             except:
                 pass
-        if time.time() - startTime >= MarkerTimeout and not myNavigation.isTurning:
+        if time.time() - startTime >= MarkerTimeout and not myNavigation.isTurning and not myNavigation.isAsleep:
             my_queue.put(5) #put 5 for stop sign, immediately read by DisplayImageByNumber below so queue does not overflow
             if os.name == "posix":
                 myNavigation.Stop()

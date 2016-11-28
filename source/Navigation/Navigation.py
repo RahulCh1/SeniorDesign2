@@ -114,7 +114,7 @@ class Navigation(object):
         '''
         self.drive_direction = 13
         self.drive_pwm_pin = 5
-        self.drive_speed = 1000
+        self.drive_speed = 1200
         
         '''
         Thread for stopping servo PWM
@@ -122,6 +122,7 @@ class Navigation(object):
         self.startSteerTime = 0
         self.steeringTimeout = 0.3 #time for servo to finish rotating
         self.thread_servo_pwm = 0
+        self.current_steeringAngle = -1
         
         self.exitMain = False
 
@@ -202,6 +203,8 @@ class Navigation(object):
         '''
         Calibration, 0.1 lines up for straight on, so subtract offset
         '''
+
+        '''
         yRotation -= self.yRotationOffset
         
         if yRotation >= self.yRotationNegativeThreshold and yRotation <= self.yRotationPositiveThreshold:
@@ -211,9 +214,9 @@ class Navigation(object):
         elif yRotation >= self.marker_rightmax_threshold:
             return self.servo_max
         else:
-            '''
+            
             Return marker rotation mapped to servo rotation number
-            '''
+            
             
             #turn left
             if yRotation <= self.yRotationNegativeThreshold:
@@ -223,6 +226,21 @@ class Navigation(object):
             elif yRotation >= self.yRotationPositiveThreshold:
                 servoSteering = int(self.servo_middle+(self.servo_range/2)*(yRotation/(self.marker_rightmax_threshold-self.yRotationPositiveThreshold))) 
                 return servoSteering
+        '''
+        
+        #turn left
+        if yRotation <= self.yRotationNegativeThreshold:
+            servoSteering = int(self.servo_middle-abs((self.servo_range/2)*(yRotation/(self.marker_rightmax_threshold-self.yRotationPositiveThreshold))))
+            return servoSteering
+        #turn right
+        elif yRotation >= self.yRotationPositiveThreshold:
+            servoSteering = int(self.servo_middle+abs((self.servo_range/2)*(yRotation/(self.marker_rightmax_threshold-self.yRotationPositiveThreshold))))
+            return servoSteering
+        else:
+            return self.current_steeringAngle
+
+    def GetSimpleAlignment(self, Translation, Rotation):
+        pass
 
     def GetClosestMarker(self,parsed_JSON):
         closestMarkerNum = 0
@@ -254,15 +272,14 @@ class Navigation(object):
         Translation z: 0 to 2.61
         '''
         try:
-            if self.isAsleep:
-                self.FlushArUcoPipe()
-            else:
+            if not self.isAsleep:
                 parsed_JSON = self.piped_json.GetParsedJSON()
         except:
             print "\nERROR: GetParsedJSON() in method GetSteeringAngleRotationTranslation() of Navigation"
-            print "Exitting all..."
-            self.Exit()
-            thread.exit()
+            print "Continuing..."
+            #print "Exitting all..."
+            #self.Exit()
+            #thread.exit()
 
         closestMarker = self.GetClosestMarker(parsed_JSON)
         
@@ -271,13 +288,14 @@ class Navigation(object):
         
         markerID = parsed_JSON["Markers"][closestMarker]["ID"]
          
-        print "Marker: " + str(markerID) + ", " + str(Translation)
+        #print "Marker: " + str(markerID) + ", " + str(Translation)
+        print "Marker: " +str(markerID) + ", " + str(Rotation)
         '''
         Get steering angle
         '''
         #print "Steering angle: " + str(self.GetMappedSteeringAngle(Rotation.Point.y)) + ", " + str(Rotation.Point.y)
-        steeringAngle = self.GetMappedSteeringAngle(Rotation.Point.y)
-                
+        #steeringAngle = self.GetMappedSteeringAngle(Rotation.Point.y)
+        #print str(steeringAngle)
         '''
         Put number in queue for displaying appropriate GUI image
         '''
@@ -315,19 +333,21 @@ class Navigation(object):
             self.Steer(self.servo_middle)
             self.Forward()
         elif markerID == 7:
-            if Translation.Point.z <= 0.53 and not self.isTurning and not self.isAsleep:
+            if Translation.Point.z <= 0.85 and not self.isTurning and not self.isAsleep:
                 my_queue.put(markerID)
                 #self.Steer(self.servo_min)
                 #self.TurnLeft(2,self.servo_min)
-                self.Steer(338)
+                self.Steer(self.servo_min) #338
+                #self.drive_speed = 1000
                 self.isTurning = True
                 self.isAsleep = True
 
                 self.Forward()
-                time.sleep(9)
+                time.sleep(4) #9
                 
                 self.isTurning = False
                 self.isAsleep = False
+                self.drive_speed = 1200
                 self.Steer(self.servo_middle)
                 #self.TurnLeftCompass(4)
                 
@@ -340,8 +360,14 @@ class Navigation(object):
         elif markerID == 5:
             self.Stop()
             self.Steer(self.servo_middle)
+            '''
+            self.Forward()
+            if abs(self.current_steeringAngle - steeringAngle) > 10:
+                self.Steer(steeringAngle)
+                self.current_steeringAngle = steeringAngle
+            '''
         if self.lastSeenMarker >= 1 and self.lastSeenMarker <= 4 and self.lastSeenMarker != markerID: #check if the marker disappeared off the screen #Translation.Point.z <= 0.323:
-            if self.lastSeenMarkerZ <= 0.45:
+            if self.lastSeenMarkerZ <= 0.9:
                 print "Stopping at marker " + str(self.lastSeenMarker)
                 my_queue.put(self.lastSeenMarker)
                 self.Stop()
@@ -350,14 +376,15 @@ class Navigation(object):
                 #time.sleep(4)
                 
                 if self.lastSeenMarker == 1:
-                    self.audioPlayer.playAudioFile("Audio/MorrilD.wav")
+                    self.audioPlayer.playAudioFile("Audio/MorrilR.wav")
                 elif self.lastSeenMarker == 2:
-                    self.audioPlayer.playAudioFile("Audio/ColvinR.wav")
+                    self.audioPlayer.playAudioFile("Audio/ColvinD.wav")
                 elif self.lastSeenMarker == 3:
-                    self.audioPlayer.playAudioFile("Audio/LibraryD.wav")
+                    self.audioPlayer.playAudioFile("Audio/LibraryR.wav")
                 elif self.lastSeenMarker == 4:
-                    self.audioPlayer.playAudioFile("Audio/WhitehurstR.wav")
-                    
+                    self.audioPlayer.playAudioFile("Audio/WhitehurstD.wav")
+
+                time.sleep(1)  #wait a little after audio ends
                 self.Forward() #keep going forward until next marker triggers
                 #time.sleep(1) #go forward a little so will stop reading stop
                 self.isAsleep = False
@@ -473,11 +500,11 @@ class Navigation(object):
             
         self.isAsleep = False
         self.isTurning = False
-        self.FlushArUcoPipe()
         
         self.Stop()
         self.Steer(self.servo_middle)
 
+    #TODO: Remove unused function
     def FlushArUcoPipe(self):
         #termios.tcflush(sys.stdin, termios.TCIOFLUSH) #flush stdin so no weird lag
         #termios.tcflush(self.piped_json.GetStdout(), termios.TCIOFLUSH)
